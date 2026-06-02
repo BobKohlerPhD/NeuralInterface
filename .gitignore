@@ -1,0 +1,74 @@
+# ==========================================
+# GitIgnore for Brain-to-Leg bypass pipeline
+# ==========================================
+
+# --- Virtual Environments and Dependencies ---
+venv/
+.venv/
+env/
+ENV/
+lib/
+lib64/
+bin/
+include/
+share/
+pyvenv.cfg
+pip-selfcheck.json
+.python-version
+
+# --- Python Bytecode and Caches ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+.ruff_cache/
+
+# --- Scientific Datasets and Downloads ---
+data/
+neuro/
+nilearn_cache/
+
+# --- AI Models, Weights, and Checkpoints ---
+models/
+*.pt
+*.pth
+*.pb
+*.ckpt
+*.h5
+*.onnx
+*.joblib
+*.pkl
+*.model
+*.weights
+*.bin
+*.npy
+*.npz
+
+# --- AI Assistants, IDEs, and Local Configs ---
+.cursor/
+.cursorrules
+.vscode/
+.idea/
+.gemini/
+.copilot/
+.env
+.env.*
+.DS_Store
+*.swp
+*.swo
+
+# --- Project Logs and Temp Files ---
+logs/
+*.log
+
+# --- Large Media and Generated Visualizations (Videos/GIFs/Plots) ---
+*.gif
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.png
+*.csv
