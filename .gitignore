@@ -2,7 +2,7 @@
 # GitIgnore for Brain-to-Leg bypass pipeline
 # ==========================================
 
-# --- Virtual Environments and Dependencies ---
+# venv and dep
 venv/
 .venv/
 env/
@@ -16,8 +16,7 @@ pyvenv.cfg
 pip-selfcheck.json
 .python-version
 
-# --- Python Bytecode and Caches ---
-__pycache__/
+# cache
 *.pyc
 *.pyo
 *.pyd
@@ -26,12 +25,12 @@ __pycache__/
 .ipynb_checkpoints/
 .ruff_cache/
 
-# --- Scientific Datasets and Downloads ---
+# data
 data/
 neuro/
 nilearn_cache/
 
-# --- AI Models, Weights, and Checkpoints ---
+# models etc
 models/
 *.pt
 *.pth
@@ -47,7 +46,7 @@ models/
 *.npy
 *.npz
 
-# --- AI Assistants, IDEs, and Local Configs ---
+# llm 
 .cursor/
 .cursorrules
 .vscode/
@@ -60,20 +59,17 @@ models/
 *.swp
 *.swo
 
-# --- Project Logs and Temp Files ---
+# logs
 logs/
 *.log
 
-# --- Large Media and Generated Visualizations (Videos/GIFs/Plots) ---
+# visuals
 *.gif
-!output/sub-038_brain_skeleton_sync.gif
-!output/sub-038_realtime_brain_timeline.gif
+!output/sub-038_cpg_brain_skeleton_sync.gif
+!output/sub-038_cpg_brain_timeline.gif
 *.mp4
 *.mov
 *.avi
 *.mkv
 *.png
 *.csv
-
-# --- Archived Work ---
-neural_bypass_archive.md
