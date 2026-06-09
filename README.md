@@ -15,10 +15,10 @@
    - Time-locked clinical event tables (`.tsv`) track gait initialization (`bgin`) and freezing episodes (`break cnt`).
 
 2. **Kinematic Engine (`core/mapping.py`)**
-   - _Note: Complex pathfinding and mapping logic has been temporarily archived to focus on visualization syncing._
-   - Implements 1.0 Hz sine-wave generator to mimic rhythmic stepping.
-   - If a clinical freeze (`break cnt`) is active in the event file, the skeleton is forced into an unmitigated "stooped" posture (height drop, partial hip/knee flexion).
-   - If normal walking (`bgin`), sine-wave driver resumes the rhythmic joint actuation.
+   - Implements a Matsuoka Central Pattern Generator (CPG)** ($w=2.0$, $b=2.5$, $\tau=0.12$, $\tau_a=0.3$) for gait rhythm.
+   - Active walking is driven at $1.8$.
+   - If a clinical freeze (`break cnt`) is active in the event file, the CPG states reset and the skeleton is placed in a forward-leaning, stooped posture (pelvis pitched forward by $0.3$ rad, adjusted hips/knees, and compensated height/ankles to prevent floor penetration).
+   - If walking resumes, CPG states are re-initialized to resume active stepping.
 
 3. **Musculoskeletal Joint Actuation (`core/mapping.py` & `core/simulation.py`)**
    - Wraps a 3D musculoskeletal lower limb environment (`myoSarcLegWalk-v0`) using MyoSuite and MuJoCo.

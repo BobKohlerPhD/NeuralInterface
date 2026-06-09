@@ -3,13 +3,14 @@ import sys
 import argparse
 import csv
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageEnhance
 import io
 import numpy as np
 import mne
 import matplotlib.pyplot as plt
 from scipy.spatial.distance import cdist
 
+# Append core and parent directories
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -50,7 +51,6 @@ def get_subject_group(sub_id):
             for row in reader:
                 if row['participant_id'] == sub_id:
                     return row['group']
-    # Fallback heuristic
     try:
         num = int(sub_id.replace('sub-', ''))
         return 'HC' if num <= 28 else 'PD'
@@ -59,15 +59,12 @@ def get_subject_group(sub_id):
 
 def find_event_transition(events_path):
     events = parse_clinical_events(events_path)
-    # 1. Search for first clinical freeze event (PD)
     for e in events:
         if e['trial_type'] == 'break cnt':
             return e['onset'], True
-    # 2. Search for first commanded stop event (HC)
     for e in events:
         if 'stop' in e['trial_type'].lower():
             return e['onset'], False
-    # 3. Default fallback
     return 30.0, False
 
 def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
@@ -110,7 +107,6 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
     
     events = parse_clinical_events(str(events_path))
     
-    # Pre-calculate spatial weights for topomap projections
     fslr = fetch_fslr()
     nodes = np.vstack([surface.load_surf_mesh(fslr['midthickness'][0])[0][::15], 
                         surface.load_surf_mesh(fslr['midthickness'][1])[0][::15]])
@@ -118,7 +114,6 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
     pos_2d -= np.mean(pos_2d, axis=0)
     pos_2d /= np.max(np.abs(pos_2d))
     
-    # Extract actual standard 10-20 layout coordinates using MNE
     info = mne.create_info(ch_names=eeg_ch, sfreq=sfreq, ch_types='eeg')
     info.set_montage(montage, on_missing='ignore')
     layout = mne.channels.find_layout(info)
@@ -142,31 +137,28 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
     bg_beta = np.array([np.mean((beta_env[motor_indices, idx] - median_beta_all[motor_indices].squeeze()) / mad_beta_all[motor_indices].squeeze()) for idx in full_indices])
     bg_delta = np.array([np.mean((delta_env[motor_indices, idx] - median_delta_all[motor_indices].squeeze()) / mad_delta_all[motor_indices].squeeze()) for idx in full_indices])
     
-    # Square root scaling to compress freeze spike while fully preserving walking fluctuations smoothly
     bg_beta_scaled = np.sign(bg_beta) * np.power(np.abs(bg_beta), 0.5)
     bg_delta_scaled = np.sign(bg_delta) * np.power(np.abs(bg_delta), 0.5)
     
-    # Dynamic limits to clearly show actual variability
     y_min = min(np.min(bg_beta_scaled), np.min(bg_delta_scaled)) - 0.5
     y_max = max(np.max(bg_beta_scaled), np.max(bg_delta_scaled)) + 1.5
     
-    bg_color = '#F9F8F6'     # Warm bone/sand background
-    text_color = '#1E293B'   # Deep slate-gray text
-    border_color = '#94A3B8' # Slate border
-    grid_color = '#EAE6E1'   # Sand gridline
+    bg_color = '#F9F8F6'
+    text_color = '#1E293B'
+    border_color = '#94A3B8'
+    grid_color = '#EAE6E1'
     
-    color_beta = '#E11D48'   # Crimson Rose (Pathology)
-    color_delta = '#4F46E5'  # Royal Indigo (Intent)
+    color_beta = '#E11D48'
+    color_delta = '#4F46E5'
     
-    # Premium divergent colormap (indigo-black -> royal indigo -> stone gray -> crimson rose -> deep burgundy)
     custom_cmap = LinearSegmentedColormap.from_list('editorial_cmap', [
-        (0.0, '#1E1B4B'),   # Deepest indigo-black (suppression)
-        (0.20, '#4F46E5'),  # Royal indigo
-        (0.28, '#E7E5E4'),  # Stone/neutral baseline (start)
-        (0.30, '#E7E5E4'),  # Stone/neutral baseline (center)
-        (0.32, '#E7E5E4'),  # Stone/neutral baseline (end)
-        (0.40, '#E11D48'),  # Vibrant crimson rose
-        (1.0, '#881337')    # Deep burgundy (severe pathology)
+        (0.0, '#1E1B4B'),
+        (0.20, '#4F46E5'),
+        (0.28, '#E7E5E4'),
+        (0.30, '#E7E5E4'),
+        (0.32, '#E7E5E4'),
+        (0.40, '#E11D48'),
+        (1.0, '#881337')
     ])
     
     plt.style.use('default')
@@ -214,7 +206,7 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
     
     status_text = ax_timeline.text(event_time + 0.15, y_max - 0.5, "", color=color_beta if is_freeze else color_delta, fontsize=12, fontweight='bold')
     
-    # Setup for Synchronized Dashboard Simulation Render
+    # Setup MyoSim and Mapper (with new CPG mapper)
     viz = EEGVisualizer(processor.channel_names)
     sim = MyoSim(env_name='myoSarcLegWalk-v0')
     mapper = GaitRestorationMapper(n_brain_regions=len(processor.channel_names))
@@ -222,7 +214,7 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
     
     frames_timeline = []
     frames_dash = []
-    print(f"Compiling {n_frames} frames for perfectly synchronized {fps} FPS animations...")
+    print(f"Compiling {n_frames} frames for perfectly synchronized {fps} FPS CPG animations...")
     
     last_node_act = None
     alpha_node = 0.15
@@ -231,7 +223,7 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
         current_time = t_full[i]
         curr_idx = int(current_time * sfreq)
         
-        # 1. Continuous Timeline Activity (Smooth High-Frequency Envelope)
+        # 1. Continuous Timeline Activity
         z_beta = (beta_env[:, curr_idx] - median_beta_all.squeeze()) / mad_beta_all.squeeze()
         z_delta = (delta_env[:, curr_idx] - median_delta_all.squeeze()) / mad_delta_all.squeeze()
         
@@ -244,7 +236,7 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
             
         node_act_scaled = np.sign(node_act) * np.power(np.abs(node_act), 0.5)
         
-        # 2. Skeleton Controller Step
+        # 2. Skeleton Controller Step (CPG integration)
         idx_feat = np.abs(feature_windows - current_time).argmin()
         features_raw = features_all[idx_feat]
         features_z = (features_raw - stats['mean']) / stats['std']
@@ -255,7 +247,15 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
             qpos = mapper.map(features_z, event, dt_sim)
             sim.step_kinematic(qpos)
             
-        img_sim = sim.get_frame()
+        img_sim_raw = sim.get_frame()
+        
+        # Post-Process: Sharpen standard MuJoCo output as per SOTA protocol
+        if img_sim_raw is not None:
+            pil_img = Image.fromarray(img_sim_raw)
+            pil_img = ImageEnhance.Sharpness(pil_img).enhance(1.5)
+            img_sim = np.array(pil_img)
+        else:
+            img_sim = img_sim_raw
         
         # 3. Render Timeline Frame
         scatter_core.set_array(node_act_scaled)
@@ -281,16 +281,19 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
         im = Image.frombuffer("RGBA", (width, height), rgba_buffer, "raw", "RGBA", 0, 1)
         frames_timeline.append(im.convert('RGB'))
         
-        # 4. Render Dashboard Frame (using exactly the same node_act_scaled)
+        # 4. Render Dashboard Frame
         frame_dash = viz.render_combined_frame_fast(node_act_scaled, title_label, img_sim)
         frames_dash.append(frame_dash)
         
         if (i+1) % 15 == 0:
-            print(f"Rendered {i+1}/{n_frames} perfectly synchronized frames...")
+            print(f"Rendered {i+1}/{n_frames} CPG frames...")
             
     plt.close(fig)
     
-    # Save Timeline
+    # Ensure output dir exists
+    os.makedirs('output', exist_ok=True)
+    
+    # Save Timeline (overwriting the old filename)
     out_timeline = os.path.join('output', f'{sub_id}_realtime_brain_timeline.gif')
     print(f"Saving {fps} FPS continuous timeline animation to {out_timeline}...")
     frames_timeline[0].save(
@@ -302,7 +305,7 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
         optimize=True
     )
     
-    # Save Dashboard
+    # Save Dashboard (overwriting the old filename)
     out_dash = os.path.join('output', f'{sub_id}_brain_skeleton_sync.gif')
     print(f"Saving {fps} FPS synchronized dashboard to {out_dash}...")
     frames_dash[0].save(
@@ -314,17 +317,15 @@ def generate_synchronized_visuals(sub_id, start_time, event_time, is_freeze):
         optimize=True
     )
     viz.reset_cache()
-    print("Success! Perfect synchronization achieved.")
-
-
+    print("Success! Perfect CPG synchronization achieved.")
 
 def main():
-    parser = argparse.ArgumentParser(description="Unified EEG and Kinematic Visual Generator")
+    parser = argparse.ArgumentParser(description="Matsuoka CPG EEG and Kinematic Visual Generator")
     parser.add_argument(
         '--participant',
         type=str,
         default='sub-038',
-        help="Subject ID (e.g. sub-038 or sub-007)"
+        help="Subject ID (e.g. sub-038)"
     )
     args = parser.parse_args()
     
@@ -332,7 +333,6 @@ def main():
     sub_dir = dataset_root / sub_id
     if not sub_dir.exists():
         print(f"Error: Participant directory {sub_dir} does not exist.")
-        # List available participant directories
         if dataset_root.exists():
             subjects = sorted([d.name for d in dataset_root.iterdir() if d.is_dir() and d.name.startswith('sub-')])
             print(f"Available participants: {', '.join(subjects)}")
@@ -343,18 +343,11 @@ def main():
         print(f"Error: Events file {events_path} not found.")
         sys.exit(1)
         
-    # Ensure output directory exists
-    os.makedirs('output', exist_ok=True)
-        
-    # Determine subject metadata
     group = get_subject_group(sub_id)
-    
-    # Automatically locate walking transition/onset
     event_time, is_freeze = find_event_transition(str(events_path))
     start_time = max(0.0, event_time - 5.0)
     
-    print(f"Participant: {sub_id} | Group: {group} | Detected Event Time: {event_time:.2f}s | Animation Start: {start_time:.2f}s")
-    
+    print(f"CPG Run: {sub_id} | Group: {group} | Event: {event_time:.2f}s | Start: {start_time:.2f}s")
     generate_synchronized_visuals(sub_id=sub_id, start_time=start_time, event_time=event_time, is_freeze=is_freeze)
 
 if __name__ == "__main__":
