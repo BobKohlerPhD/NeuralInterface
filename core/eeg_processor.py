@@ -97,38 +97,55 @@ class EEGProcessor:
         print(f"Identified {len(indices)} motor channels: {[self.channel_names[i] for i in indices]}")
         return indices
 
-    def extract_features_window(self, window_size_ms: float = 200.0, step_ms: float = 100.0) -> Tuple[np.ndarray, np.ndarray, dict]:
+    def extract_features_window(self, step_ms: float = 100.0) -> Tuple[np.ndarray, np.ndarray, dict]:
         """
-        Extracts clinically relevant features and full PSD for visualization.
+        SOTA Dual-Window feature extraction:
+        - 500 ms window for Beta (13-30 Hz) for fast reaction.
+        - 2000 ms window for Delta/RP (0.5-3.0 Hz) to resolve slow frequencies.
         Returns: (features, psds, stats)
         """
         if self.time_series is None:
             raise ValueError("No EEG data loaded. Cannot extract features.")
         
-        window_size_pts = int((window_size_ms / 1000.0) * self.sfreq)
         step_pts = int((step_ms / 1000.0) * self.sfreq)
         
-        n_windows = (self.n_timepoints - window_size_pts) // step_pts + 1
+        # Define window sizes in points
+        beta_win_pts = int(0.500 * self.sfreq) # 500ms
+        delta_win_pts = int(2.000 * self.sfreq) # 2000ms
+        
+        # We align both windows such that their ending timepoints match the current time step
+        n_windows = (self.n_timepoints - delta_win_pts) // step_pts + 1
         all_features = []
         all_psds = []
         
-        print(f"Extracting features for {n_windows} windows...")
+        print(f"Extracting dual-window features for {n_windows} windows...")
         
-        freqs = np.fft.rfftfreq(window_size_pts, d=1/self.sfreq)
-        beta_mask = (freqs >= 13) & (freqs <= 30)
-        rp_mask = (freqs >= 0.5) & (freqs <= 3.0)
+        beta_freqs = np.fft.rfftfreq(beta_win_pts, d=1/self.sfreq)
+        delta_freqs = np.fft.rfftfreq(delta_win_pts, d=1/self.sfreq)
+        
+        beta_mask = (beta_freqs >= 13) & (beta_freqs <= 30)
+        rp_mask = (delta_freqs >= 0.5) & (delta_freqs <= 3.0)
         
         for i in range(n_windows):
-            start = i * step_pts
-            end = start + window_size_pts
-            window_data = self.time_series[start:end, :] 
+            # The current time index is at the end of the delta window
+            delta_start = i * step_pts
+            current_end = delta_start + delta_win_pts
+            
+            # Beta window is the last 500ms of the current_end
+            beta_start = current_end - beta_win_pts
+            
+            window_beta = self.time_series[beta_start:current_end, :]
+            window_delta = self.time_series[delta_start:current_end, :]
             
             # FFT and PSD
-            fft_vals = np.abs(np.fft.rfft(window_data, axis=0))**2
-            psd = np.mean(fft_vals, axis=1) # Average across channels for spectrum view
+            fft_beta = np.abs(np.fft.rfft(window_beta, axis=0))**2
+            fft_delta = np.abs(np.fft.rfft(window_delta, axis=0))**2
             
-            beta_power = np.mean(fft_vals[beta_mask, :], axis=0)
-            rp_power = np.mean(fft_vals[rp_mask, :], axis=0)
+            # PSD for general visual view (from 500ms window)
+            psd = np.mean(fft_beta, axis=1) 
+            
+            beta_power = np.mean(fft_beta[beta_mask, :], axis=0)
+            rp_power = np.mean(fft_delta[rp_mask, :], axis=0)
             
             all_features.append(np.concatenate([beta_power, rp_power]))
             all_psds.append(psd)
@@ -137,10 +154,14 @@ class EEGProcessor:
         all_psds = np.array(all_psds)
         
         # Calculate session-wide stats for global normalization
+        median_features = np.median(all_features, axis=0)
+        mad_features = np.median(np.abs(all_features - median_features), axis=0) * 1.4826 + 1e-6
         stats = {
             'mean': np.mean(all_features, axis=0),
             'std': np.std(all_features, axis=0) + 1e-6,
-            'freqs': freqs
+            'median': median_features,
+            'mad': mad_features,
+            'freqs': beta_freqs # Use beta freqs for visualization spectrum
         }
         
         return all_features, all_psds, stats

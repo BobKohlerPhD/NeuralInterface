@@ -66,9 +66,14 @@ logs/
 
 # --- Large Media and Generated Visualizations (Videos/GIFs/Plots) ---
 *.gif
+!output/sub-038_brain_skeleton_sync.gif
+!output/sub-038_realtime_brain_timeline.gif
 *.mp4
 *.mov
 *.avi
 *.mkv
 *.png
 *.csv
+
+# --- Archived Work ---
+neural_bypass_archive.md
