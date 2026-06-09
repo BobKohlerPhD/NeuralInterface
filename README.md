@@ -35,6 +35,7 @@
 
 ![Clinical Visualization Demonstration](output/sub-038_brain_skeleton_sync.gif)
 
+![Clinical Visualization Demonstration](output/sub-038_realtime_brain_timeline.gif)
 ---
 
 ## System Setup & Execution
