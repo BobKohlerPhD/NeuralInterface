@@ -1,4 +1,4 @@
-# Brain-to-Leg: Clinical Neural-Gait Visualization Pipeline
+# Neural Interfacing
 
  Synchronized visual pipeline for Parkinson's Disease (PD) locomotion and clinical freezing of gait (FoG) events using MyoSuite.
  
